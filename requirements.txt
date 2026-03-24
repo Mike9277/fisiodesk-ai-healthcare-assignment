@@ -1,0 +1,17 @@
+# Requirements for FisioDesk AI Query System
+
+# Web Framework
+flask==3.0.0
+flask-cors==4.0.0
+
+# Database
+pymongo==4.6.1
+
+# HTTP Client
+requests==2.31.0
+
+# Environment
+python-dotenv==1.0.0
+
+# Utilities
+python-dateutil==2.8.2

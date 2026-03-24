@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FisioDesk AI Query System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .status-bar {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ddd;
+        }
+        
+        .status-dot.ok { background: #4CAF50; }
+        .status-dot.error { background: #f44336; }
+        .status-dot.loading { background: #FFC107; animation: pulse 1s infinite; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .query-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .query-input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        #queryInput {
+            flex: 1;
+            padding: 15px 20px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            transition: border-color 0.3s;
+        }
+        
+        #queryInput:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        #queryInput::placeholder {
+            color: #aaa;
+        }
+        
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .target-query {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .target-query strong {
+            color: #667eea;
+        }
+        
+        .target-query p {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .results-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .results-count {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .execution-time {
+            color: #999;
+            font-size: 12px;
+        }
+        
+        .patient-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .patient-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .patient-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        
+        .patient-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .patient-meta {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-success {
+            background: #e8f5e9;
+            color: #4CAF50;
+        }
+        
+        .badge-warning {
+            background: #fff3e0;
+            color: #FF9800;
+        }
+        
+        .badge-danger {
+            background: #ffebee;
+            color: #f44336;
+        }
+        
+        .patient-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .detail-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .detail-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #999;
+            margin-bottom: 5px;
+        }
+        
+        .detail-value {
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .no-show-info {
+            background: #fff3e0;
+            border-left: 4px solid #FF9800;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        .no-show-info h4 {
+            color: #FF9800;
+            margin-bottom: 10px;
+        }
+        
+        .actions-section {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        .actions-section h4 {
+            color: #1976D2;
+            margin-bottom: 10px;
+        }
+        
+        .action-item {
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 5px;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .action-item::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #1976D2;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .api-info {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏥 FisioDesk AI Query System</h1>
+            <p class="subtitle">Sistema di query intelligenti per professionisti sanitari</p>
+            
+            <div class="status-bar">
+                <div class="status-item">
+                    <div class="status-dot" id="apiStatus"></div>
+                    <span>API: <span id="apiStatusText">Controllando...</span></span>
+                </div>
+                <div class="status-item">
+                    <div class="status-dot" id="dbStatus"></div>
+                    <span>Database: <span id="dbStatusText">Controllando...</span></span>
+                </div>
+            </div>
+        </header>
+        
+        <section class="query-section">
+            <h2 style="margin-bottom: 20px;">🔍 Query in Linguaggio Naturale</h2>
+            
+            <div class="query-input-group">
+                <input type="text" id="queryInput" 
+                       placeholder="Es: Mostra pazienti con dolore lombare che hanno mostrato miglioramento negli ultimi 3 mesi ma hanno saltato l'ultimo appuntamento"
+                       value="Mostra pazienti con dolore lombare che hanno mostrato miglioramento negli ultimi 3 mesi ma hanno saltato l'ultimo appuntamento">
+                <button onclick="executeQuery()">Cerca</button>
+            </div>
+            
+            <div class="target-query">
+                <strong>🎯 Query Target:</strong>
+                <p>Mostra pazienti con dolore lombare che hanno mostrato miglioramento negli ultimi 3 mesi ma hanno saltato l'ultimo appuntamento</p>
+            </div>
+        </section>
+        
+        <section class="results-section">
+            <div class="results-header">
+                <div>
+                    <h2>📋 Risultati</h2>
+                    <span class="results-count" id="resultsCount">0 pazienti trovati</span>
+                </div>
+                <span class="execution-time" id="executionTime"></span>
+            </div>
+            
+            <div id="resultsContainer">
+                <div class="empty-state">
+                    <h3>Nessuna ricerca effettuata</h3>
+                    <p>Esegui una query per vedere i risultati qui</p>
+                </div>
+            </div>
+        </section>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://localhost:5000/api/v1';
+        
+        // Check system health on load
+        document.addEventListener('DOMContentLoaded', () => {
+            checkHealth();
+        });
+        
+        async function checkHealth() {
+            const apiDot = document.getElementById('apiStatus');
+            const apiText = document.getElementById('apiStatusText');
+            const dbDot = document.getElementById('dbStatus');
+            const dbText = document.getElementById('dbStatusText');
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    apiDot.className = 'status-dot ok';
+                    apiText.textContent = 'Online';
+                    dbDot.className = 'status-dot ok';
+                    dbText.textContent = 'Connesso';
+                } else {
+                    apiDot.className = 'status-dot error';
+                    apiText.textContent = 'Degraded';
+                    dbDot.className = 'status-dot error';
+                    dbText.textContent = data.mongodb;
+                }
+            } catch (error) {
+                apiDot.className = 'status-dot error';
+                apiText.textContent = 'Offline';
+                dbDot.className = 'status-dot error';
+                dbText.textContent = 'Non connesso';
+            }
+        }
+        
+        async function executeQuery() {
+            const query = document.getElementById('queryInput').value;
+            const container = document.getElementById('resultsContainer');
+            const button = document.querySelector('button');
+            
+            // Show loading
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Elaborazione query in corso...</p>
+                </div>
+            `;
+            button.disabled = true;
+            
+            try {
+                const response = await fetch(`${API_BASE}/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, reference_date: '2024-12-31' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    container.innerHTML = `
+                        <div class="error-message">
+                            <strong>Errore:</strong> ${data.error}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                container.innerHTML = `
+                    <div class="error-message">
+                        <strong>Errore di connessione:</strong> ${error.message}
+                    </div>
+                `;
+            } finally {
+                button.disabled = false;
+            }
+        }
+        
+        function displayResults(data) {
+            const container = document.getElementById('resultsContainer');
+            const countEl = document.getElementById('resultsCount');
+            const timeEl = document.getElementById('executionTime');
+            
+            countEl.textContent = `${data.results.length} pazienti trovati`;
+            timeEl.textContent = `⏱ ${data.metadata.execution_time_seconds}s`;
+            
+            if (data.results.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>Nessun risultato</h3>
+                        <p>La query non ha prodotto risultati. Prova a modificare i criteri di ricerca.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = data.results.map(patient => {
+                const noShow = patient.ultimo_appuntamento;
+                const valutazione = patient.ultima_valutazione;
+                const conditions = valutazione?.condizioni_estratte;
+                
+                return `
+                    <div class="patient-card">
+                        <div class="patient-header">
+                            <div>
+                                <div class="patient-name">${patient.nome} ${patient.cognome}</div>
+                                <div class="patient-meta">
+                                    Età: ${patient.eta} anni | 
+                                    Stato: <span class="badge badge-success">${patient.stato}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="badge badge-success">✓ ${patient.miglioramento}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="patient-details">
+                            <div class="detail-item">
+                                <div class="detail-label">Condizione</div>
+                                <div class="detail-value">${patient.condizione}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Telefono</div>
+                                <div class="detail-value">${patient.telefono || 'N/D'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Email</div>
+                                <div class="detail-value">${patient.email || 'N/D'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Ultima Valutazione</div>
+                                <div class="detail-value">${valutazione?.data ? new Date(valutazione.data).toLocaleDateString('it-IT') : 'N/D'}</div>
+                            </div>
+                        </div>
+                        
+                        ${noShow ? `
+                        <div class="no-show-info">
+                            <h4>⚠️ Ultimo Appuntamento Saltato</h4>
+                            <p><strong>Data:</strong> ${new Date(noShow.data).toLocaleDateString('it-IT')}</p>
+                            <p><strong>Note:</strong> ${noShow.note || 'Nessuna nota'}</p>
+                        </div>
+                        ` : ''}
+                        
+                        ${valutazione?.descrizione ? `
+                        <div class="detail-item" style="margin-top: 15px; background: white;">
+                            <div class="detail-label">Riepilogo Ultima Valutazione</div>
+                            <div class="detail-value">${valutazione.descrizione}</div>
+                            ${conditions ? `
+                            <div style="margin-top: 10px;">
+                                ${conditions.has_lombare_pain ? '<span class="badge badge-warning" style="margin-right: 5px;">Lombare</span>' : ''}
+                                ${conditions.has_miglioramento ? '<span class="badge badge-success" style="margin-right: 5px;">Miglioramento</span>' : ''}
+                                ${conditions.has_peggioramento ? '<span class="badge badge-danger">Peggioramento</span>' : ''}
+                                ${conditions.matched_terms?.length > 0 ? `<br><small style="color: #666;">Termini rilevati: ${conditions.matched_terms.join(', ')}</small>` : ''}
+                            </div>
+                            ` : ''}
+                        </div>
+                        ` : ''}
+                        
+                        <div class="actions-section">
+                            <h4>📌 Azioni Consigliate</h4>
+                            ${patient.azioni_consigliate.map(a => `<div class="action-item">${a}</div>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Allow Enter key to submit
+        document.getElementById('queryInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                executeQuery();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,59 +1,126 @@
-version: '3.8'
+# Docker Compose for FisioDesk AI Query System
+# Full stack with MongoDB, Flask API, and MongoDB Express
 
 services:
+  # MongoDB Database
   mongodb:
-    image: mongodb/mongodb-atlas-local:8.0
+    image: mongo:7.0
     container_name: fisiodesk-mongodb
+    restart: unless-stopped
     ports:
       - "27017:27017"
-    environment:
-      MONGO_INITDB_DATABASE: fisiodesk
     volumes:
       - mongodb_data:/data/db
-      - mongodb_config:/data/configdb
-      - mongodb_mongot:/data/mongot
     networks:
       - fisiodesk-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Container che importa i dati automaticamente
+  # MongoDB Seed - Import sample data
   mongodb-seed:
-    image: mongodb/mongodb-atlas-local:8.0
+    image: mongo:7.0
     container_name: fisiodesk-mongodb-seed
-    volumes:
-      - ./data:/data
-    command: >
-      bash -c "
-        sleep 5 &&
-        mongoimport --host mongodb --db fisiodesk --collection pazienti --file /data/pazienti.json --jsonArray &&
-        mongoimport --host mongodb --db fisiodesk --collection schede_valutazione --file /data/schede_valutazione.json --jsonArray &&
-        mongoimport --host mongodb --db fisiodesk --collection diario_trattamenti --file /data/diario_trattamenti.json --jsonArray &&
-        mongoimport --host mongodb --db fisiodesk --collection eventi_calendario --file /data/eventi_calendario.json --jsonArray &&
-        echo 'Dati importati con successo! ✅'
-      "
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./data:/data:ro
+    command: >
+      mongosh mongodb://mongodb:27017/fisiodesk --eval "
+        // Load and insert patients
+        var pazienti = JSON.parse(cat('/data/pazienti.json'));
+        db.pazienti.deleteMany({});
+        db.pazienti.insertMany(pazienti);
+        print('Imported ' + pazienti.length + ' patients');
+        
+        // Load and insert schede_valutazione
+        var schede = JSON.parse(cat('/data/schede_valutazione.json'));
+        db.schede_valutazione.deleteMany({});
+        db.schede_valutazione.insertMany(schede);
+        print('Imported ' + schede.length + ' evaluation forms');
+        
+        // Load and insert diario_trattamenti
+        var trattamenti = JSON.parse(cat('/data/diario_trattamenti.json'));
+        db.diario_trattamenti.deleteMany({});
+        db.diario_trattamenti.insertMany(trattamenti);
+        print('Imported ' + trattamenti.length + ' treatments');
+        
+        // Load and insert eventi_calendario
+        var eventi = JSON.parse(cat('/data/eventi_calendario.json'));
+        db.eventi_calendario.deleteMany({});
+        db.eventi_calendario.insertMany(eventi);
+        print('Imported ' + eventi.length + ' calendar events');
+        
+        // Create indexes
+        db.pazienti.createIndex('professionista_principale');
+        db.schede_valutazione.createIndex('paziente_id');
+        db.schede_valutazione.createIndex('data');
+        db.schede_valutazione.createIndex([('paziente_id', 1), ('data', -1)]);
+        db.diario_trattamenti.createIndex('paziente_id');
+        db.diario_trattamenti.createIndex('data');
+        db.diario_trattamenti.createIndex([('paziente_id', 1), ('data', -1)]);
+        db.eventi_calendario.createIndex('paziente_id');
+        db.eventi_calendario.createIndex('data');
+        db.eventi_calendario.createIndex('stato');
+        db.eventi_calendario.createIndex([('paziente_id', 1), ('data', -1)]);
+        print('Database indexes created');
+        
+        print('Data import completed successfully!');
+      "
     networks:
       - fisiodesk-network
 
-  # Optional: MongoDB Express per visualizzare i dati (UI su http://localhost:8081)
+  # MongoDB Express - Web UI for database
   mongo-express:
-    image: mongo-express:latest
+    image: mongo-express:1.0.2
     container_name: fisiodesk-mongo-express
+    restart: unless-stopped
     ports:
       - "8081:8081"
     environment:
-      ME_CONFIG_MONGODB_URL: mongodb://mongodb:27017/
-      ME_CONFIG_BASICAUTH: false
+      ME_CONFIG_MONGODB_URL: "mongodb://mongodb:27017"
+      ME_CONFIG_BASICAUTH: "false"
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     networks:
       - fisiodesk-network
 
-volumes:
-  mongodb_data:
-  mongodb_config:
-  mongodb_mongot:
+  # Flask API - AI Query Service
+  fisiodesk-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fisiodesk-api
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      FLASK_HOST: "0.0.0.0"
+      FLASK_PORT: 5000
+      FLASK_DEBUG: "false"
+      MONGODB_URI: "mongodb://mongodb:27017"
+      MONGODB_DB: "fisiodesk"
+      AI_PROVIDER: "mock"
+      TIMEFRAME_REFERENCE_DATE: "2024-12-31"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - fisiodesk-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
   fisiodesk-network:
     driver: bridge
+
+volumes:
+  mongodb_data:
