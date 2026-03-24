@@ -19,7 +19,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # MongoDB Seed - Import sample data
+  # MongoDB Seed - Import sample data using mongoimport (handles EJSON correctly)
   mongodb-seed:
     image: mongo:7.0
     container_name: fisiodesk-mongodb-seed
@@ -28,47 +28,29 @@ services:
         condition: service_healthy
     volumes:
       - ./data:/data:ro
+    # FIX: use mongoimport which natively handles Extended JSON ($oid, $date)
+    # mongosh + JSON.parse() does NOT convert $oid -> ObjectId or $date -> ISODate
     command: >
-      mongosh mongodb://mongodb:27017/fisiodesk --eval "
-        // Load and insert patients
-        var pazienti = JSON.parse(cat('/data/pazienti.json'));
-        db.pazienti.deleteMany({});
-        db.pazienti.insertMany(pazienti);
-        print('Imported ' + pazienti.length + ' patients');
-        
-        // Load and insert schede_valutazione
-        var schede = JSON.parse(cat('/data/schede_valutazione.json'));
-        db.schede_valutazione.deleteMany({});
-        db.schede_valutazione.insertMany(schede);
-        print('Imported ' + schede.length + ' evaluation forms');
-        
-        // Load and insert diario_trattamenti
-        var trattamenti = JSON.parse(cat('/data/diario_trattamenti.json'));
-        db.diario_trattamenti.deleteMany({});
-        db.diario_trattamenti.insertMany(trattamenti);
-        print('Imported ' + trattamenti.length + ' treatments');
-        
-        // Load and insert eventi_calendario
-        var eventi = JSON.parse(cat('/data/eventi_calendario.json'));
-        db.eventi_calendario.deleteMany({});
-        db.eventi_calendario.insertMany(eventi);
-        print('Imported ' + eventi.length + ' calendar events');
-        
-        // Create indexes
-        db.pazienti.createIndex('professionista_principale');
-        db.schede_valutazione.createIndex('paziente_id');
-        db.schede_valutazione.createIndex('data');
-        db.schede_valutazione.createIndex([('paziente_id', 1), ('data', -1)]);
-        db.diario_trattamenti.createIndex('paziente_id');
-        db.diario_trattamenti.createIndex('data');
-        db.diario_trattamenti.createIndex([('paziente_id', 1), ('data', -1)]);
-        db.eventi_calendario.createIndex('paziente_id');
-        db.eventi_calendario.createIndex('data');
-        db.eventi_calendario.createIndex('stato');
-        db.eventi_calendario.createIndex([('paziente_id', 1), ('data', -1)]);
-        print('Database indexes created');
-        
-        print('Data import completed successfully!');
+      bash -c "
+        mongoimport --uri=mongodb://mongodb:27017/fisiodesk --collection=pazienti              --file=/data/pazienti.json              --jsonArray --drop &&
+        mongoimport --uri=mongodb://mongodb:27017/fisiodesk --collection=schede_valutazione    --file=/data/schede_valutazione.json    --jsonArray --drop &&
+        mongoimport --uri=mongodb://mongodb:27017/fisiodesk --collection=diario_trattamenti    --file=/data/diario_trattamenti.json    --jsonArray --drop &&
+        mongoimport --uri=mongodb://mongodb:27017/fisiodesk --collection=eventi_calendario     --file=/data/eventi_calendario.json     --jsonArray --drop &&
+        mongosh mongodb://mongodb:27017/fisiodesk --eval \"
+          db.pazienti.createIndex({ professionista_principale: 1 });
+          db.schede_valutazione.createIndex({ paziente_id: 1 });
+          db.schede_valutazione.createIndex({ data: 1 });
+          db.schede_valutazione.createIndex({ paziente_id: 1, data: -1 });
+          db.diario_trattamenti.createIndex({ paziente_id: 1 });
+          db.diario_trattamenti.createIndex({ data: 1 });
+          db.diario_trattamenti.createIndex({ paziente_id: 1, data: -1 });
+          db.eventi_calendario.createIndex({ paziente_id: 1 });
+          db.eventi_calendario.createIndex({ data: 1 });
+          db.eventi_calendario.createIndex({ stato: 1 });
+          db.eventi_calendario.createIndex({ paziente_id: 1, data: -1 });
+          print('Indexes created');
+        \"
+        echo 'Seed completed successfully'
       "
     networks:
       - fisiodesk-network
