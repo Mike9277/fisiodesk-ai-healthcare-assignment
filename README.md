@@ -1,277 +1,202 @@
-# FisioDesk AI Query System
+# FisioDesk - MongoDB Development Environment
 
-## 🎯 Sistema di Query Intelligenti con AI per Professionisti Sanitari
+A Docker-based MongoDB Atlas Local development environment for FisioDesk, a physiotherapy patient management system with built-in vector search capabilities.
 
-Sistema MVP che permette ai professionisti sanitari di effettuare query complesse sui dati clinici usando linguaggio naturale e AI.
+## Features
 
-### Query Target Implementata
+- **MongoDB Atlas Local** with vector search support
+- **Pre-loaded sample data** for development
+- **MongoDB Express UI** for database visualization
+- **Automatic data import** on startup
+- **Vector search ready** for AI-powered features
 
-> *"Mostra pazienti con dolore lombare che hanno mostrato miglioramento negli ultimi 3 mesi ma hanno saltato l'ultimo appuntamento"*
+## Prerequisites
 
----
+- Docker Desktop 4.31+ (macOS/Windows) or Docker Engine 27.0+ (Linux)
+- Docker Compose
+- 4GB RAM minimum
+- Network connection for pulling Docker images
 
-## 📁 Struttura del Progetto
+## Quick Start
 
-```
-fisiodesk-ai-healthcare-assignment/
-├── app.py                    # Flask API principale
-├── config.py                 # Configurazione del sistema
-├── requirements.txt           # Dipendenze Python
-├── Dockerfile                # Container per l'API
-├── docker-compose.yml        # Stack completo (MongoDB + API + UI)
-├── index.html                # Frontend web per test
-├── ARCHITECTURE.md           # Diagramma architettura completo
-├── data/                     # Dataset di test
-│   ├── pazienti.json
-│   ├── schede_valutazione.json
-│   ├── diario_trattamenti.json
-│   └── eventi_calendario.json
-└── services/
-    ├── __init__.py
-    ├── ai_service.py         # AI per estrazione condizioni cliniche
-    └── data_service.py        # Servizio per query MongoDB
-```
-
----
-
-## 🚀 Quick Start
-
-### Opzione 1: Script di Avvio Automatico (Windows) ⭐
-
+1. Clone or download repository:
 ```bash
-# Doppio click su start.bat oppure da terminale:
-start.bat
-
-# Lo script offre:
-# [1] Avvia tutto
-# [2] Riavvia da zero
-# [3] Ferma tutto
-# [4] Verifica status
-# [5] Apri interfacce web
+git clone <repository-url>
+cd ai-healthcare-assignment
 ```
 
-### Opzione 2: Docker Compose Manuale
-
+2. Start the services:
 ```bash
-# Clona il repository
-git clone <repo-url>
-cd fisiodesk-ai-healthcare-assignment
+docker-compose up
+```
 
-# Avvia tutti i servizi
+3. Access the services:
+- **MongoDB**: `localhost:27017`
+- **MongoDB Express UI**: `http://localhost:8081`
+- **MongoDB Compass**: `mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000`
+
+4. Verify data import:
+```bash
+docker logs fisiodesk-mongodb-seed
+```
+
+## Project Structure
+
+```
+.
+├── docker-compose.yml            # Docker services configuration
+├── data/                         # Sample data files
+│   ├── pazienti.json            # Patient records
+│   ├── schede_valutazione.json  # Evaluation forms
+│   ├── diario_trattamenti.json  # Treatment logs
+│   └── eventi_calendario.json   # Calendar events
+├── ai_integration_homework_v2.md # Original assignment document
+├── USE_CASES_AND_TESTS.md       # Detailed test cases and use cases
+└── README.md                    # This file
+```
+
+## Database Collections
+
+### pazienti
+Patient records containing:
+- Personal information (name, age, contact)
+- Assigned physiotherapist
+- Registration date and status
+
+### schede_valutazione
+Patient evaluation forms for tracking assessments
+
+### diario_trattamenti
+Treatment diary entries documenting patient sessions
+
+### eventi_calendario
+Calendar events for scheduling appointments
+
+## Vector Search Capabilities
+
+MongoDB Atlas Local includes built-in vector search capabilities for AI-powered features.
+
+## Common Commands
+
+### Start Services
+```bash
+# Start all services in background
 docker-compose up -d
 
-# Verifica che tutti i servizi siano attivi
+# Start with logs visible
+docker-compose up
+```
+
+### Stop Services
+```bash
+# Stop containers
+docker-compose down
+
+# Stop and remove volumes (deletes all data)
+docker-compose down -v
+```
+
+### Database Operations
+```bash
+# Connect to MongoDB shell
+docker exec -it fisiodesk-mongodb mongosh
+
+# Re-import sample data
+docker-compose restart mongodb-seed
+
+# View import logs
+docker logs fisiodesk-mongodb-seed
+```
+
+### Troubleshooting
+```bash
+# Check service status
 docker-compose ps
 
-# I servizi saranno disponibili su:
-# - API Flask: http://localhost:5000
-# - MongoDB Express UI: http://localhost:8081
-# - MongoDB: localhost:27017
+# View MongoDB logs
+docker logs fisiodesk-mongodb
+
+# Rebuild and restart
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
 ```
 
-### Opzione 3: Esecuzione Locale
+## Development Workflow
 
-```bash
-# Crea un virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# oppure
-venv\Scripts\activate  # Windows
+1. **Start the environment**: `docker-compose up -d`
+2. **Develop your application** connecting to `mongodb://localhost:27017/fisiodesk`
+3. **Inspect data** using:
+   - MongoDB Express: `http://localhost:8081`
+   - MongoDB Compass (client locale): `mongodb://127.0.0.1:27017/?directConnection=true`
+4. **Stop when done**: `docker-compose down`
 
-# Installa dipendenze
-pip install -r requirements.txt
+## Support
 
-# Avvia MongoDB localmente (o usa la stringa di connessione esistente)
-# Avvia l'API
-python app.py
-```
+For issues or questions:
+1. Check container logs: `docker logs <container-name>`
+2. Verify Docker resources in Docker Desktop settings
+3. Ensure ports 27017 and 8081 are not in use
 
 ---
 
-## 🧪 Testare la Query Target
+## 🎯 Challenge per il Candidato
 
-### Via API
+Questo repository è preparato per testare le tue competenze di **system design** e **AI integration** in un contesto reale di gestionale sanitario.
 
-```bash
-# Esegue la query target
-curl -X GET http://localhost:5000/api/v1/demo/target-query
+### Il Compito: Sistema di Query Intelligenti
 
-# Oppure con una query personalizzata
-curl -X POST http://localhost:5000/api/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "mostra pazienti con dolore lombare che hanno mostrato miglioramento", "reference_date": "2024-12-31"}'
+Devi implementare un sistema che permetta ai professionisti sanitari di fare query complesse sui loro dati usando linguaggio naturale e AI.
+
+**🎯 Query Target da Implementare:**
+> *"Mostra pazienti con dolore lombare che hanno mostrato miglioramento negli ultimi 3 mesi ma hanno saltato l'ultimo appuntamento"*
+
+### Perché è Complessa?
+- Richiede **AI** per interpretare "miglioramento" dai testi liberi
+- Combina **multiple collections** MongoDB (schede_valutazione, eventi_calendario, pazienti)  
+- Filtra per **timeframe** specifico
+- Correla **compliance paziente** con **progressi clinici**
+
+### Vincoli Operativi
+- ⚡ **Performance**: <2 secondi con 50+ professionisti concorrenti
+- 💰 **Budget limitato** per API calls AI
+- 🔄 **Integrazione** con sistema esistente (SpringBoot + MongoDB)
+- 📊 **Accuratezza** per decisioni cliniche
+
+### I Tuoi Deliverable
+1. **Diagramma architettura** della tua soluzione
+2. **MVP funzionante** con Docker Compose
+3. **README** con setup e demo della query target
+4. **Documentazione** dei trade-offs principali
+
+### Dati di Test Disponibili
+Il database contiene casi realistici che supportano la query target:
+Nota: i dati coprono Marzo-Dicembre 2024; per il filtro "ultimi 3 mesi" usa una data di riferimento esplicita (es. 2024-12-31 o la data massima nel dataset).
+
+- **Mario Rossi**: Dolore lombare con miglioramento + no_show (caso positivo ✅)
+- **Laura Bianchi**: Dolore lombare con miglioramento + no_show (caso positivo ✅) 
+- **Roberto Romano**: Low back pain con miglioramento + no_show (caso positivo ✅)
+- **Marco Colombo**: Lombalgia con miglioramento + no_show (caso positivo ✅)
+- **Anna Ferrari**: Lombalgia SENZA miglioramento + no_show (caso negativo ❌)
+- **Giuseppe Verdi**: Solo cervicalgia, niente lombare (caso negativo ❌)
+
+### Struttura Collections MongoDB
+
+```javascript
+// pazienti - 7 pazienti con professionisti diversi
+{ _id, nome, cognome, eta, telefono, email, professionista_principale, stato }
+
+// schede_valutazione - 18 valutazioni con variabilità linguistica
+{ _id, paziente_id, data, descrizione, professionista_id }
+// Contiene: "dolore lombare", "mal di schiena", "lombalgia", "rachialgia", "low back pain"
+// E indicatori di miglioramento: "miglioramento", "sta meglio", "progressi", "risoluzione"
+
+// diario_trattamenti - 16 trattamenti con outcome diversi  
+{ _id, paziente_id, data, descrizione, professionista_id }
+
+// eventi_calendario - 21 appuntamenti con stati variegati
+{ _id, paziente_id, data, stato, durata, professionista_id, note }
+// Stati: "completato", "no_show", "cancellato", "prenotato"
 ```
 
-### Via Frontend Web
-
-Apri `index.html` nel browser (o vai a http://localhost:5000 quando l'API è in esecuzione).
-
-### Via MongoDB Express
-
-Vai a http://localhost:8081 per esplorare il database.
-
----
-
-## 📊 Risultati Attesi dalla Query Target
-
-### ✅ Casi Positivi (4 pazienti)
-
-| Paziente | Condizione | Miglioramento | No Show |
-|----------|------------|---------------|---------|
-| Mario Rossi | Dolore lombare (8/10 → 3/10) | ✓ | 20/12/2024 |
-| Laura Bianchi | Rachialgia lombare | ✓ | 22/12/2024 |
-| Roberto Romano | Low back pain (VAS 9/10 → risolto) | ✓ | 30/12/2024 |
-| Marco Colombo | Lombalgia acuta | ✓ | 31/12/2024 |
-
-### ❌ Casi Negativi (esclusi dalla query)
-
-| Paziente | Motivo Esclusione |
-|----------|-------------------|
-| Anna Ferrari | Lombalgia MA no_show senza miglioramento |
-| Giuseppe Verdi | Solo cervicalgia, niente dolore lombare |
-| Francesca Ricci | Solo spalla congelata |
-
----
-
-## 🔌 API Endpoints
-
-### `GET /api/v1/health`
-Verifica lo stato del sistema.
-
-```json
-{
-  "status": "ok",
-  "mongodb": "ok",
-  "timestamp": "2024-12-31T10:00:00"
-}
-```
-
-### `POST /api/v1/query`
-Esegue una query in linguaggio naturale.
-
-**Request:**
-```json
-{
-  "query": "mostra pazienti con dolore lombare...",
-  "reference_date": "2024-12-31"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "query": "mostra pazienti con dolore lombare...",
-  "analysis": {
-    "intents": ["list_patients", "filter_by_condition"],
-    "timeframe": "3_mesi",
-    "condition_type": "dolore_lombare"
-  },
-  "results": [...],
-  "metadata": {
-    "total_results": 4,
-    "execution_time_seconds": 0.123
-  }
-}
-```
-
-### `GET /api/v1/demo/target-query`
-Esegue direttamente la query target predefinita.
-
-### `GET /api/v1/patients/<id>/summary`
-Restituisce un riepilogo completo del paziente.
-
-### `POST /api/v1/analyze`
-Analizza un testo clinico per estrarre condizioni.
-
----
-
-## ⚙️ Configurazione
-
-Le variabili d'ambiente possono essere impostate nel file `.env`:
-
-```env
-FLASK_HOST=0.0.0.0
-FLASK_PORT=5000
-FLASK_DEBUG=false
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DB=fisiodesk
-AI_PROVIDER=mock  # 'openai' per usare GPT
-OPENAI_API_KEY=your-api-key
-TIMEFRAME_REFERENCE_DATE=2024-12-31
-```
-
----
-
-## 🏗️ Architettura del Sistema
-
-### Componenti Principali
-
-1. **Flask API Layer**
-   - Gestisce le richieste HTTP
-   - Analizza le query in linguaggio naturale
-   - Formatta e restituisce i risultati
-
-2. **AI Service Layer**
-   - `AIDataExtractor`: Estrae condizioni cliniche dai testi usando pattern matching
-   - `MockAIAnalyzer`: Simula risposte AI (MVP)
-   - Supporto per OpenAI GPT (produzione)
-
-3. **Data Service Layer**
-   - Interroga MongoDB
-   - Aggrega dati da più collections
-   - Gestisce la logica di query complesse
-
-4. **MongoDB**
-   - 4 collections: pazienti, schede_valutazione, diario_trattamenti, eventi_calendario
-   - Indici ottimizzati per performance
-
-### Data Flow
-
-```
-Query Naturale → Intent Analysis → Set Intersection → Risultati Arricchiti
-     ↓                  ↓                   ↓
-  AI/Mock → 3 Parallel Queries → Aggregation → Response
-```
-
----
-
-## 📈 Trade-offs Principali
-
-### 1. Performance vs Accuratezza
-- **Decisione**: Pre-calcolare le estrazioni AI per query comuni
-- **Trade-off**: Leggera attesa per nuovi dati vs risposta <2s
-- **Mitigazione**: Job in background aggiorna i dati entro 5 minuti
-
-### 2. Costo vs Funzionalità
-- **Decisione**: Usa pattern matching prima di chiamare AI
-- **Trade-off**: Meno preciso su query complesse vs riduzione costi 10x
-- **Mitigazione**: Indica chiaramente quando l'AI fornirebbe risultati migliori
-
-### 3. Semplicità vs Flessibilità
-- **Decisione**: Supporto iniziale solo per terminologia medica italiana
-- **Trade-off**: Limitato supporto multi-lingua vs MVP più veloce
-- **Mitigazione**: Facile da estendere con nuovi language pack
-
----
-
-## 🔮 Roadmap Future
-
-- [ ] Integrazione OpenAI GPT per analisi più sofisticata
-- [ ] Supporto multi-lingua (inglese, spagnolo)
-- [ ] Pre-processing batch con Celery
-- [ ] Redis caching per query frequenti
-- [ ] Vector search con MongoDB Atlas
-- [ ] Dashboard React/Angular per il frontend
-
----
-
-## 📝 Licenza
-
-MIT License - Dreambuilders Srl
-
----
-
-## 👤 Autore
-
-Sviluppato come assignment tecnico per Dreambuilders Srl - Healthcare Management Systems
+Per i casi di test dettagliati vedi `USE_CASES_AND_TESTS.md` 🚀

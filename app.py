@@ -96,6 +96,7 @@ def execute_query():
                 has_condition    = analysis.get('has_condition', False),
                 condition_type   = analysis.get('condition_type', 'lombare'),
                 has_improvement  = analysis.get('has_improvement', False),
+                has_worsening    = analysis.get('has_worsening', False),
                 timeframe_months = analysis.get('timeframe_months', 3),
                 has_no_show      = analysis.get('has_no_show', False),
                 reference_date   = reference_date,

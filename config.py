@@ -33,9 +33,13 @@ class Config:
     
     # Medical Term Patterns (Italian)
     LOMBAR_PAIN_PATTERNS = [
-        'dolore lombare', 'lombalgia', 'low back pain', 
-        'mal di schiena', 'rachialgia lombare', 
-        'dolore alla bassa schiena', 'colpo della strega'
+    r"\bdolore lombare\b",
+    r"\blombalgia\b",
+    r"\blow back pain\b",
+    r"\bmal di schiena\b",
+    r"\brachialgia lombare\b",
+    r"\bdolore alla bassa schiena\b",
+    r"\bcolpo della strega\b"
     ]
     
     IMPROVEMENT_PATTERNS = [
@@ -51,3 +55,13 @@ class Config:
         'situazione stazionaria', 'non migliora', 'persistente',
         'deterioramento', 'invariato'
     ]
+
+    NEGATION_PATTERNS = [
+    r"\bnessun(?:\s+\w+){0,3}\s+dolore\b",
+    r"\bnessuna(?:\s+\w+){0,3}\s+dolore\b",
+    r"\bassenza(?:\s+di)?(?:\s+\w+){0,3}\s+dolore\b",
+    r"\bnon\s+(?:ha|presenta|riferisce)(?:\s+\w+){0,3}\s+dolore\b",
+    r"\bsenza(?:\s+\w+){0,3}\s+dolore\b",
+    r"\bdolore\s+(?:risolto|scomparso)\b",
+    ]
+

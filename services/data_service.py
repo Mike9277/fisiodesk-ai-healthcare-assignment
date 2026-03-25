@@ -22,7 +22,19 @@ class DataService:
         self.db_name = db_name or self.config.MONGODB_DB
         self._client = None
         self._db = None
+        #self._ai_extractor = AIDataExtractor()
+        from services.ai_service import AIDataExtractor
         self._ai_extractor = AIDataExtractor()
+
+        extractor = AIDataExtractor()
+
+        laura_text = "Netto miglioramento del quadro clinico. La signora riesce ora a piegarsi senza dolore acuto alla schiena."
+        marco_text = "Controllo finale. Il signor Colombo sta benissimo, nessun dolore residuo alla zona lombare. Ha ripreso tutte le attività senza problemi."
+        giulia_text = "Il paziente lamenta dolore lombare acuto."
+
+        print(extractor.extract_conditions(laura_text)['has_lombare_pain'])  # False
+        print(extractor.extract_conditions(marco_text)['has_lombare_pain'])  # False
+        print(extractor.extract_conditions(giulia_text)['has_lombare_pain']) # True
 
     def connect(self):
         """Establish database connection"""
@@ -158,53 +170,116 @@ class DataService:
     # -------------------------------------------------------------------------
 
     def get_patients_with_lombare_pain(self, reference_date: datetime = None) -> Set[str]:
-        """
-        Find patients who have had lombare pain mentioned in clinical documents
-        within the last 3 months relative to reference_date.
-        """
         if reference_date is None:
             reference_date = datetime(2024, 12, 31)
 
-        three_months_ago = reference_date - timedelta(days=90)
-        patients_with_lombare: Set[str] = set()
+        patients = self.db.pazienti.find({})
+        result = set()
 
-        for collection_name in ('schede_valutazione', 'diario_trattamenti'):
-            docs = self.db[collection_name].find({
-                'data': {'$gte': three_months_ago, '$lte': reference_date}
-            })
-            for doc in docs:
-                text = doc.get('descrizione', '')
-                if self._ai_extractor.extract_conditions(text)['has_lombare_pain']:
-                    pid = self._normalize_id(doc.get('paziente_id'))
-                    if pid:
-                        patients_with_lombare.add(pid)
+        for p in patients:
+            pid = self._normalize_id(p['_id'])
+            oid = self._to_object_id(pid)
 
-        return patients_with_lombare
+            # 🔥 PRENDI SOLO L'ULTIMA VALUTAZIONE
+            last_eval = self.db.schede_valutazione.find_one(
+                {'paziente_id': oid},
+                sort=[('data', -1)]
+            )
+
+            if not last_eval:
+                continue
+
+            extraction = self._ai_extractor.extract_conditions(
+                last_eval.get('descrizione', '')
+            )
+
+            if extraction['has_lombare_pain']:
+                result.add(pid)
+
+        return result
 
     def get_patients_with_miglioramento(self, reference_date: datetime = None) -> Set[str]:
-        """
-        Find patients who have shown improvement (and NOT worsening) in
-        clinical documents within the last 3 months.
-        """
         if reference_date is None:
             reference_date = datetime(2024, 12, 31)
 
-        three_months_ago = reference_date - timedelta(days=90)
-        patients_with_improvement: Set[str] = set()
+        patients = self.db.pazienti.find({})
+        result = set()
 
-        for collection_name in ('schede_valutazione', 'diario_trattamenti'):
-            docs = self.db[collection_name].find({
-                'data': {'$gte': three_months_ago, '$lte': reference_date}
-            })
-            for doc in docs:
-                text = doc.get('descrizione', '')
-                extraction = self._ai_extractor.extract_conditions(text)
-                if extraction['has_miglioramento'] and not extraction['has_peggioramento']:
-                    pid = self._normalize_id(doc.get('paziente_id'))
-                    if pid:
-                        patients_with_improvement.add(pid)
+        for p in patients:
+            pid = self._normalize_id(p['_id'])
+            oid = self._to_object_id(pid)
 
-        return patients_with_improvement
+            last_eval = self.db.schede_valutazione.find_one(
+                {'paziente_id': oid},
+                sort=[('data', -1)]
+            )
+
+            if not last_eval:
+                continue
+
+            extraction = self._ai_extractor.extract_conditions(
+                last_eval.get('descrizione', '')
+            )
+
+            # 🔥 MIGLIORAMENTO MA NON RISOLTO
+            if extraction['has_miglioramento'] and not extraction.get('is_resolved', False):
+                result.add(pid)
+
+        return result
+
+    def get_patients_with_worsening(self, reference_date: datetime = None) -> Set[str]:
+        """
+        🔥 CORRETTO: usa SOLO l'ultima valutazione (come miglioramento e lombare)
+        """
+
+        patients = self.db.pazienti.find({})
+        result = set()
+
+        for p in patients:
+            pid = self._normalize_id(p['_id'])
+            oid = self._to_object_id(pid)
+
+            # 👉 PRENDI SOLO L'ULTIMA VALUTAZIONE
+            last_eval = self.db.schede_valutazione.find_one(
+                {'paziente_id': oid},
+                sort=[('data', -1)]
+            )
+
+            if not last_eval:
+                continue
+
+            extraction = self._ai_extractor.extract_conditions(
+                last_eval.get('descrizione', '')
+            )
+
+            # 👉 PEGGIORAMENTO SOLO SE ATTIVO (non risolto)
+            if extraction['has_peggioramento']:
+                result.add(pid)
+
+        return result
+
+    def get_patients_with_attended(self) -> Set[str]:
+        """
+        Find patients whose most recent appointment has stato == 'completato'.
+        Uses the same single-pass approach as get_patients_with_no_show.
+        """
+        all_events = list(self.db.eventi_calendario.find(
+            {},
+            {'paziente_id': 1, 'stato': 1, 'data': 1}
+        ).sort('data', -1))
+
+        seen: Set[str] = set()
+        attended_patients: Set[str] = set()
+
+        for event in all_events:
+            pid = self._normalize_id(event.get('paziente_id'))
+            if pid is None or pid in seen:
+                continue
+            seen.add(pid)
+            if event.get('stato') == 'completato':
+                attended_patients.add(pid)
+
+        return attended_patients
 
     def get_patients_with_no_show(self) -> Set[str]:
         """
@@ -285,75 +360,76 @@ class DataService:
     # -------------------------------------------------------------------------
 
     def execute_complex_query(self,
-                              has_condition: bool = True,
+                              has_condition: bool = False,
                               condition_type: str = 'lombare',
-                              has_improvement: bool = True,
+                              has_improvement: bool = False,
+                              has_worsening: bool = False,
                               timeframe_months: int = 3,
-                              has_no_show: bool = True,
+                              has_no_show: bool = False,
+                              has_attended: bool = False,
                               reference_date: datetime = None) -> List[Dict]:
         """
-        Execute the complex query with specified parameters.
+        Execute a query filtering on any combination of:
+          - clinical condition (lombare, cervicale, spalla)
+          - improvement signal in the last N months
+          - worsening signal in the last N months
+          - last appointment = no_show
+          - last appointment = completato (attended)
 
-        Finds patients who:
-        1. Have the specified condition (default: lombare pain)
-        2. Have shown improvement in the specified timeframe
-        3. Have had a no_show as their most recent appointment
+        All active flags are AND-ed.  If no flags are set, returns all patients.
         """
         if reference_date is None:
             reference_date = datetime(2024, 12, 31)
 
-        # Step 1 — patients with the condition
+        candidate_sets = []
+
         if has_condition:
-            patients_with_condition = self.get_patients_with_lombare_pain(reference_date)
-        else:
-            patients_with_condition = {
-                self._normalize_id(p['_id'])
-                for p in self.db.pazienti.find({'stato': 'attivo'}, {'_id': 1})
-            }
-
-        # Step 2 — patients with improvement
-        patients_with_improvement = (
-            self.get_patients_with_miglioramento(reference_date)
-            if has_improvement
-            else patients_with_condition
-        )
-
-        # Step 3 — patients whose last appointment was a no_show
-        patients_no_show = self.get_patients_with_no_show() if has_no_show else set()
-
-        # Step 4 — intersection
-        result_ids = patients_with_condition & patients_with_improvement
+            candidate_sets.append(self.get_patients_with_lombare_pain(reference_date))
+        if has_improvement:
+            candidate_sets.append(self.get_patients_with_miglioramento(reference_date))
+        if has_worsening:
+            candidate_sets.append(self.get_patients_with_worsening(reference_date))
         if has_no_show:
-            result_ids &= patients_no_show
+            candidate_sets.append(self.get_patients_with_no_show())
+        if has_attended:
+            candidate_sets.append(self.get_patients_with_attended())
 
-        # Step 5 — enrich results
+        # No filters → return everything
+        if not candidate_sets:
+            return self.get_all_patients()
+
+        # AND-intersection of all candidate sets
+        result_ids = candidate_sets[0]
+        for s in candidate_sets[1:]:
+            result_ids = result_ids & s
+
+        # Enrich results
         results = []
         for paziente_id in result_ids:
             patient_data = self.get_patient_details(paziente_id)
             if not patient_data:
                 continue
 
-            evaluations = self.get_patient_evaluations(paziente_id)
+            evaluations  = self.get_patient_evaluations(paziente_id)
             appointments = self.get_patient_appointments(paziente_id)
-            treatments = self.get_patient_treatments(paziente_id)
+            treatments   = self.get_patient_treatments(paziente_id)
 
-            # Find the most recent no_show appointment
             last_no_show = next(
-                (a for a in appointments if a.get('stato') == 'no_show'),
-                None
+                (a for a in appointments if a.get('stato') == 'no_show'), None
             )
 
             results.append({
-                'paziente': patient_data,
-                'ultima_valutazione': evaluations[0] if evaluations else None,
+                'paziente':            patient_data,
+                'ultima_valutazione':  evaluations[0]  if evaluations  else None,
                 'storico_valutazioni': evaluations,
                 'ultimo_appuntamento': appointments[0] if appointments else None,
-                'no_show': last_no_show,
+                'no_show':             last_no_show,
                 'storico_appuntamenti': appointments,
                 'storico_trattamenti': treatments,
+                'has_lombare':         has_condition,
+                'has_improvement':     has_improvement,
             })
 
-        # Sort by no_show date descending
         results.sort(
             key=lambda x: x['no_show']['data'] if x.get('no_show') and x['no_show'].get('data') else '',
             reverse=True
